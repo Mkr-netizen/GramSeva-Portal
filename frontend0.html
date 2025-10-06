@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Category-wise Citizen Messaging</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            padding: 32px;
+            background: #f6f8fa;
+        }
+        h2 {
+            margin-top: 30px;
+        }
+        form {
+            background: #fff;
+            padding: 24px;
+            border-radius: 8px;
+            margin-bottom: 40px;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.07);
+            max-width: 420px;
+        }
+        label {
+            font-weight: bold;
+        }
+        input, select, textarea, button {
+            margin-top: 8px;
+            width: 100%;
+            padding: 6px;
+            border: 1px solid #bbb;
+            border-radius: 4px;
+            font-size: 16px;
+            margin-bottom: 16px;
+        }
+        button {
+            background: #2563eb;
+            color: #fff;
+            border: none;
+            cursor: pointer;
+            font-size: 18px;
+        }
+        button:hover {
+            background: #1d4ed8;
+        }
+        .success {
+            color: green;
+        }
+        .error {
+            color: #c00;
+        }
+        #citizenList {
+            margin-top: 12px;
+            background: #fff;
+            padding: 16px;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.07);
+            border-radius: 8px;
+            max-width: 420px;
+        }
+    </style>
+</head>
+<body>
+
+<h2>Add Citizen</h2>
+<form id="addCitizenForm">
+    <label for="name">Name:</label>
+    <input type="text" id="name" required>
+    <label for="phone">Phone:</label>
+    <input type="text" id="phone" required>
+    <label for="categories">Categories (choose one or more):</label>
+    <select id="categories" multiple size="6" required>
+        <option value="Senior Citizen">Senior Citizen</option>
+        <option value="Student">Student</option>
+        <option value="Pregnant Woman">Pregnant Woman</option>
+        <option value="Newborn">Newborn</option>
+        <option value="Farmer">Farmer</option>
+        <option value="Job Seeker">Job Seeker</option>
+        <option value="General Citizen">General Citizen</option>
+    </select>
+    <button type="submit">Add Citizen</button>
+    <div id="addCitizenStatus"></div>
+</form>
+
+<h2>Send Message</h2>
+<form id="sendMessageForm">
+    <label for="targetCategory">Target Category:</label>
+    <select id="targetCategory" required>
+        <option value="">--Select--</option>
+        <option value="Senior Citizen">Senior Citizen</option>
+        <option value="Student">Student</option>
+        <option value="Pregnant Woman">Pregnant Woman</option>
+        <option value="Newborn">Newborn</option>
+        <option value="Farmer">Farmer</option>
+        <option value="Job Seeker">Job Seeker</option>
+        <option value="General Citizen">General Citizen</option>
+    </select>
+    <label for="deliveryMethod">Delivery Method:</label>
+    <select id="deliveryMethod" required>
+        <option value="sms">SMS</option>
+        <option value="whatsapp">WhatsApp</option>
+        <option value="both">Both SMS & WhatsApp</option>
+    </select>
+    <label for="messageText">Message:</label>
+    <textarea id="messageText" rows="5" required></textarea>
+    <button type="submit">Send Message</button>
+    <div id="sendMessageStatus"></div>
+</form>
+
+<h2>All Citizens</h2>
+<button onclick="loadCitizens()">Refresh List</button>
+<div id="citizenList"></div>
+
+<script>
+const apiUrl = "http://localhost:5000";
+
+// Add citizen
+const addForm = document.getElementById('addCitizenForm');
+const addStatus = document.getElementById('addCitizenStatus');
+addForm.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    addStatus.textContent = '';
+    const name = document.getElementById('name').value.trim();
+    const phone = document.getElementById('phone').value.trim();
+    const select = document.getElementById('categories');
+    const categories = Array.from(select.selectedOptions).map(option => option.value);
+
+    if (!name || !phone || categories.length === 0) {
+        addStatus.textContent = 'All fields are required.';
+        addStatus.className = 'error';
+        return;
+    }
+
+    const response = await fetch(${apiUrl}/citizens, {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({name, phone, categories})
+    });
+
+    if (response.ok) {
+        addStatus.textContent = 'Citizen added successfully!';
+        addStatus.className = 'success';
+        addForm.reset();
+        loadCitizens();
+    } else {
+        addStatus.textContent = 'Error adding citizen (possibly duplicate phone).';
+        addStatus.className = 'error';
+    }
+});
+
+// Send Message
+const sendForm = document.getElementById('sendMessageForm');
+const sendStatus = document.getElementById('sendMessageStatus');
+sendForm.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    sendStatus.textContent = '';
+    const category = document.getElementById('targetCategory').value;
+    const method = document.getElementById('deliveryMethod').value;
+    const messageText = document.getElementById('messageText').value.trim();
+
+    if (!category || !method || !messageText) {
+        sendStatus.textContent = 'All fields are required.';
+        sendStatus.className = 'error';
+        return;
+    }
+
+    // Fetch citizens in category
+    const citizensResponse = await fetch(${apiUrl}/citizens?category=${encodeURIComponent(category)});
+    const citizens = await citizensResponse.json();
+
+    if (!Array.isArray(citizens) || citizens.length === 0) {
+        sendStatus.textContent = 'No citizens found in that category.';
+        sendStatus.className = 'error';
+        return;
+    }
+
+    // Messaging API integration: (for now, just a demo)
+    const numbers = citizens.map(c => c.phone).join(', ');
+    window.alert(`Sending message via ${method} to:
+${numbers}
+
+Message:
+${messageText}`);
+    sendStatus.textContent = 'Message sending simulated (integrate API in backend for real messaging).';
+    sendStatus.className = 'success';
+
+    // To integrate: POST to backend /send-message with { category, method, messageText }
+});
+
+// Load all citizens
+async function loadCitizens() {
+    const listDiv = document.getElementById('citizenList');
+    listDiv.textContent = 'Loading...';
+    const response = await fetch(${apiUrl}/citizens);
+    if (!response.ok) {
+        listDiv.innerHTML = '<span class="error">Unable to load citizens.</span>';
+        return;
+    }
+    const data = await response.json();
+    if (data.length === 0) {
+        listDiv.innerHTML = '<span>No citizens found.</span>';
+        return;
+    }
+    let html = '<ol>';
+    for (const c of data) {
+        html += <li><strong>${c.name}</strong> (${c.phone}) — [${c.categories.join(', ')}]</li>;
+    }
+    html += '</ol>';
+    listDiv.innerHTML = html;
+}
+
+// Load citizens on page load
+window.onload = loadCitizens;
+</script>
+</body>
+</html>
